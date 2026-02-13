@@ -1,5 +1,9 @@
 local M = {}
 
+local function strip_ansi(s)
+  return s:gsub("\27%[[%d;]*m", "")
+end
+
 function M.find_class_at_cursor()
   local bufnr = vim.api.nvim_get_current_buf()
   local row = vim.api.nvim_win_get_cursor(0)[1]
@@ -31,6 +35,7 @@ function M.render(config, callback)
 
   local output = {}
   vim.fn.jobstart(cmd, {
+    env = { TERM = "dumb", NO_COLOR = "1" },
     stdout_buffered = true,
     stderr_buffered = true,
     on_stdout = function(_, data)
@@ -57,8 +62,10 @@ function M.render(config, callback)
 
         local video_path = nil
         for _, line in ipairs(output) do
-          local path = line:match("File ready at%s+'([^']+)'")
-            or line:match("File ready at%s+(.+)$")
+          local clean = strip_ansi(line)
+          local path = clean:match("File ready at%s+'([^']+)'")
+            or clean:match("File ready at%s+\"([^\"]+)\"")
+            or clean:match("File ready at%s+(%S+%.mp4)")
           if path then
             video_path = vim.trim(path)
             break
