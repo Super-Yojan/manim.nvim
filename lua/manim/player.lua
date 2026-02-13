@@ -1,11 +1,19 @@
 local M = {}
 
-local job_id = nil
+local pid = nil
 local current_path = nil
 
 function M.play(video_path, config)
-  if job_id and current_path == video_path then
-    return
+  -- Same file: mpv is still running, nothing to do
+  if pid and current_path == video_path then
+    -- check if mpv is actually still alive
+    local ok = pcall(vim.uv.kill, pid, 0)
+    if ok then
+      return
+    end
+    -- mpv died, clean up and relaunch below
+    pid = nil
+    current_path = nil
   end
 
   M.stop()
@@ -13,27 +21,27 @@ function M.play(video_path, config)
   local cmd = vim.list_extend({ "mpv" }, config.mpv_args)
   table.insert(cmd, video_path)
 
-  job_id = vim.fn.jobstart(cmd, {
+  local job_id = vim.fn.jobstart(cmd, {
     detach = true,
     on_exit = function()
-      job_id = nil
+      pid = nil
       current_path = nil
     end,
   })
 
   if job_id <= 0 then
     vim.notify("manim: failed to start mpv", vim.log.levels.ERROR)
-    job_id = nil
     return
   end
 
+  pid = vim.fn.jobpid(job_id)
   current_path = video_path
 end
 
 function M.stop()
-  if job_id then
-    vim.fn.jobstop(job_id)
-    job_id = nil
+  if pid then
+    pcall(vim.uv.kill, pid, 15) -- SIGTERM
+    pid = nil
     current_path = nil
   end
 end
