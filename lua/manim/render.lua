@@ -52,24 +52,15 @@ function M.render(config, callback)
       vim.schedule(function()
         if code ~= 0 then
           vim.notify("manim: render failed (exit " .. code .. ")", vim.log.levels.ERROR)
-          for _, line in ipairs(output) do
-            if line ~= "" then
-              vim.notify(line, vim.log.levels.ERROR)
-            end
-          end
           return
         end
 
-        local video_path = nil
-        for _, line in ipairs(output) do
-          local clean = strip_ansi(line)
-          local path = clean:match("File ready at%s+'([^']+)'")
-            or clean:match("File ready at%s+\"([^\"]+)\"")
-            or clean:match("File ready at%s+(%S+%.mp4)")
-          if path then
-            video_path = vim.trim(path)
-            break
-          end
+        local full = strip_ansi(table.concat(output, "\n"))
+        -- collapse the line-wrapped path back into one line
+        local video_path = full:match("File ready at%s+'([^']+)'")
+          or full:match("File ready at%s+\"([^\"]+)\"")
+        if video_path then
+          video_path = video_path:gsub("%s+", "")
         end
 
         if not video_path then
